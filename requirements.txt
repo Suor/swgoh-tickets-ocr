@@ -1,0 +1,9 @@
+funcy==1.10.2
+# OCR
+opencv-python==3.4.1.15
+Pillow==5.1.0
+pytesseract==0.2.2
+# Scraping
+cssselect==1.0.3
+lxml==4.2.1
+requests==2.19.1
