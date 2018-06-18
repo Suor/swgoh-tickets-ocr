@@ -7,3 +7,4 @@ pytesseract==0.2.2
 cssselect==1.0.3
 lxml==4.2.1
 requests==2.19.1
+python-Levenshtein==0.12.0
