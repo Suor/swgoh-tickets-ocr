@@ -2,7 +2,7 @@ import sys
 from itertools import groupby
 import re
 
-from funcy import re_find, silent, ignore, memoize
+from funcy import re_find, silent, ignore, memoize, ldistinct, some, lmap
 import cv2 as cv
 import numpy as np
 from PIL import Image, ImageFilter
@@ -30,41 +30,77 @@ def parse_tickets(text):
 
     # Parse (nick, ticket count) pairs
     known_names = read_names()
-    ticket_pairs = re.findall(r'(\w[\w\d ]*)\W+(\d+)?', ticket_s)
+    ticket_pairs = re.findall(r'(\w[\w\d ]*)\W+((?:\w )?[\doOоО]+)?', ticket_s)
+    print(ticket_pairs)
     tickets = {}
     for name, count in ticket_pairs:
-        name = name.strip()
-        if len(name) <= 1 or name.isdigit() or name == 'ДАЛЕЕ':
-            continue
-        count = silent(int)(count)
-
         # Check if name is known or similar enough to known one
-        guess, warning = guess_name(name)
-        if guess:
-            result['tickets'][guess] = count
+        name, warning = parse_name(name)
         if warning:
             result['warnings'].append(warning)
+        if name is None:
+            continue
+
+        # Parse number part
+        count = parse_number(count)
+        if count is None:
+            result['warnings'].append('No count for %s' % name)
+
+        if count is not None:
+            result['tickets'][name] = count
 
     return result
+
+
+def parse_name(text):
+    # Names to try:
+    #   - full with no trailing nor dup spaces
+    #   - one with single junk cleared from both ends
+    #   - any part longer than 1 char
+    name_parts = text.strip().split()
+    full_name = ' '.join(name_parts)  # No trailing and dup spaces
+    clean_name = re.sub(r'^\w\s|\s\w$', '', full_name)
+    names = ldistinct([full_name, clean_name] + [n for n in name_parts if len(n) > 1])
+
+    versions = lmap(guess_name, names)
+    return some(versions) or versions[0]
 
 
 def guess_name(name):
     known_names = read_names()
 
+    if len(name) <= 1 or name.isdigit() or name == 'ДАЛЕЕ':
+        return None, None
+
     if name in known_names:
         return name, None
-    else:
-        distances = [distance(n, name) for n in known_names]
-        min_dist = min(distances)
-        if min_dist >= len(name):
-            return None, 'Gave up on "%s"' % name
-        if min_dist > 2:
-            return name, 'No match for "%s"' % name
 
-        candidates = [n for n, dist in zip(known_names, distances) if dist == min_dist]
-        if len(candidates) > 1:
-            return None, 'Multiple matches for "%s": %s' % (name, ', '.join(candidates))
-        return candidates[0], "Recognized %s as %s" % (name, candidates[0])
+    distances = [distance(n, name) for n in known_names]
+    min_dist = min(distances)
+    if min_dist >= len(name):
+        return None, 'Gave up on %s' % name
+    if min_dist > 2:
+        return name, 'No match for %s' % name
+
+    candidates = [n for n, dist in zip(known_names, distances) if dist == min_dist]
+    if len(candidates) > 1:
+        return None, 'Multiple matches for %s: %s' % (name, ', '.join(candidates))
+    return candidates[0], "Recognized %s as %s" % (name, candidates[0])
+
+
+def parse_number(s):
+    # Replace all sorts of Os, english and russian
+    s = re.sub(r'[oOоО]', '0', s)
+    numbers = re.findall(r'\d+', s)
+
+    # Filter out single digits as noise
+    if len(numbers) > 1:
+        numbers = [s for s in numbers if len(s) > 1]
+
+    if len(numbers) > 1:
+        return None
+
+    return silent(int)(numbers[0])
 
 
 @memoize
@@ -81,7 +117,6 @@ def ocr_tickets(filename):
     np_image = np.asarray(block)
 
     mask = select_colors(np_image)
-    show(mask)
     return image_to_string(mask, lang='rus+eng')
 
 
