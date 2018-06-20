@@ -2,7 +2,7 @@ import sys
 from itertools import groupby
 import re
 
-from funcy import re_find, silent, ignore, memoize, ldistinct, some, lmap
+from funcy import re_find, silent, ignore, memoize, ldistinct, some, lmap, walk_keys, interleave
 import cv2 as cv
 import numpy as np
 from PIL import Image, ImageFilter
@@ -62,6 +62,9 @@ def parse_name(text):
     clean_name = re.sub(r'^\w\s|\s\w$', '', full_name)
     names = ldistinct([full_name, clean_name] + [n for n in name_parts if len(n) > 1])
 
+    # Use "ocr normalized" version if raw one fails
+    names = ldistinct(interleave(names, map(ocr_normalize, names)))
+
     versions = lmap(guess_name, names)
     return some(versions) or versions[0]
 
@@ -73,7 +76,7 @@ def guess_name(name):
         return None, None
 
     if name in known_names:
-        return name, None
+        return known_names[name], None
 
     distances = [distance(n, name) for n in known_names]
     min_dist = min(distances)
@@ -85,7 +88,8 @@ def guess_name(name):
     candidates = [n for n, dist in zip(known_names, distances) if dist == min_dist]
     if len(candidates) > 1:
         return None, 'Multiple matches for %s: %s' % (name, ', '.join(candidates))
-    return candidates[0], "Recognized %s as %s" % (name, candidates[0])
+    guess = known_names[candidates[0]]
+    return guess, "Recognized %s as %s" % (name, guess)
 
 
 def parse_number(s):
@@ -106,7 +110,15 @@ def parse_number(s):
 @memoize
 def read_names():
     with open('dict.txt') as f:
-        return {l.strip() for l in f.readlines()}
+        names = {l.strip(): l.strip() for l in f.readlines()}
+        return {**walk_keys(ocr_normalize, names), **names}
+
+
+# Russian to english, 0 to O
+OCR_NORMALIZE_TABLE = str.maketrans('0КЕНХВАРОСМТукенгхаросмт', 'OKEHXBAPOCMTyKeHrxapocmT')
+
+def ocr_normalize(s):
+    return s.translate(OCR_NORMALIZE_TABLE).upper()
 
 
 # OCR part
