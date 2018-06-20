@@ -2,7 +2,7 @@ import sys
 from itertools import groupby
 import re
 
-from funcy import re_find, silent, ignore, memoize, ldistinct, some, lmap, walk_keys, interleave
+from funcy import re_find, silent, ignore, memoize, ldistinct, first, lmap, walk_keys, interleave
 import cv2 as cv
 import numpy as np
 from PIL import Image, ImageFilter
@@ -12,9 +12,9 @@ from Levenshtein import distance
 
 def main():
     for filename in sys.argv[1:]:
-        print(filename)
+        # print(filename)
         text = ocr_tickets(filename)
-        print(text)
+        # print(text)
         result = parse_tickets(text)
         print(result)
 
@@ -26,12 +26,12 @@ def parse_tickets(text):
 
     # Parse total number of tickets
     total_s, ticket_s = re.split(r'30\s*000', text, 2)
-    total = silent(int)(re.sub(r'\D', '', re_find(r'[\d\s]+\D*$', total_s)))
+    result['total'] = silent(int)(re.sub(r'\D', '', re_find(r'[\d\s]+\D*$', total_s)))
 
     # Parse (nick, ticket count) pairs
     known_names = read_names()
-    ticket_pairs = re.findall(r'(\w[\w\d ]*)\W+((?:\w )?[\doOоО]+)?', ticket_s)
-    print(ticket_pairs)
+    ticket_pairs = re.findall(r'(\w[\w\d \|]*)\W+((?:\w )?[\doOоО]+)?', ticket_s)
+    # print(ticket_pairs)
     tickets = {}
     for name, count in ticket_pairs:
         # Check if name is known or similar enough to known one
@@ -66,13 +66,14 @@ def parse_name(text):
     names = ldistinct(interleave(names, map(ocr_normalize, names)))
 
     versions = lmap(guess_name, names)
-    return some(versions) or versions[0]
+    return first((guess, warning) for guess, warning in versions if not warning) \
+        or first((guess, warning) for guess, warning in versions if guess)
 
 
 def guess_name(name):
     known_names = read_names()
 
-    if len(name) <= 1 or name.isdigit() or name == 'ДАЛЕЕ':
+    if len(name) <= 1 or name.isdigit() or 'ДАЛЕЕ' in name:
         return None, None
 
     if name in known_names:
@@ -88,8 +89,7 @@ def guess_name(name):
     candidates = [n for n, dist in zip(known_names, distances) if dist == min_dist]
     if len(candidates) > 1:
         return None, 'Multiple matches for %s: %s' % (name, ', '.join(candidates))
-    guess = known_names[candidates[0]]
-    return guess, "Recognized %s as %s" % (name, guess)
+    return known_names[candidates[0]], None
 
 
 def parse_number(s):
@@ -101,7 +101,7 @@ def parse_number(s):
     if len(numbers) > 1:
         numbers = [s for s in numbers if len(s) > 1]
 
-    if len(numbers) > 1:
+    if len(numbers) != 1:
         return None
 
     return silent(int)(numbers[0])
@@ -115,7 +115,7 @@ def read_names():
 
 
 # Russian to english, 0 to O
-OCR_NORMALIZE_TABLE = str.maketrans('0КЕНХВАРОСМТукенгхаросмт', 'OKEHXBAPOCMTyKeHrxapocmT')
+OCR_NORMALIZE_TABLE = str.maketrans('0КЕНХВАРОСМТукенгхаросмт|', 'OKEHXBAPOCMTyKeHrxapocmTl')
 
 def ocr_normalize(s):
     return s.translate(OCR_NORMALIZE_TABLE).upper()
