@@ -36,8 +36,7 @@ def parse_tickets(text):
 
     # Parse (nick, ticket count) pairs
     known_names = read_names()
-    ticket_pairs = re.findall(r'(\w[\w\d \|]*)\W+((?:\w )?[\doOоО]+)?', ticket_s)
-    # print(ticket_pairs)
+    ticket_pairs = re.findall(r'(\w[\w\d \|]*)\W+((?:\w )?[\doOоО]+\b)?', ticket_s)
     tickets = {}
     for name, count in ticket_pairs:
         # Check if name is known or similar enough to known one
@@ -136,13 +135,22 @@ def ocr_tickets(filename):
     np_image = np.asarray(block)
 
     mask = select_colors(np_image)
+
+    # Thiken text for better recognition, works sporadically
+    # kernel = cv.getStructuringElement(cv.MORPH_CROSS, (3, 3))
+    # mask = cv.dilate(mask, kernel, iterations=1)
+    # mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel, iterations=1)
+
+    # Invert to get black on white, which works better for whatever reason
+    mask = cv.bitwise_not(mask)
+
     # show(mask)
     return image_to_string(mask, lang='rus+eng')
 
 
 def crop_right(im):
     W, H = im.size
-    region = im.crop((0.7 * W, 0, W, H))
+    region = im.crop((0.73 * W, 0, W, H))
     return region
 
 
@@ -150,18 +158,21 @@ def select_colors(np_image):
     nick_color = np.array([242, 242, 242])
     numbers_color = np.array([153, 252, 252])
 
-    nick_mask = cv.inRange(np_image, nick_color - 65, nick_color + 65)
-    numbers_mask = cv.inRange(np_image, numbers_color - 60, numbers_color + 60)
+    nick_mask = cv.inRange(np_image, nick_color - 74, nick_color + 74)
+    numbers_mask = cv.inRange(np_image, numbers_color - 80, numbers_color + 80)
     return nick_mask + numbers_mask
 
 
 def show(im):
     """Show PIL or numpy image. Debug function"""
-    if isinstance(im, Image.Image):
-        im.show()
-    else:
-        Image.fromarray(im).show()
+    _image(im).show()
 
+def save(im, filename):
+    """Save PIL or numpy image. Debug function"""
+    _image(im).save(filename)
+
+def _image(im):
+    return im if isinstance(im, Image.Image) else Image.fromarray(im)
 
 
 if __name__ == '__main__':
