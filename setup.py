@@ -7,7 +7,7 @@ setup(
     author_email='suor.web@gmail.com',
 
     description='Parse SWGoH tickets screenshots.',
-    long_description=open('README.md').read(),
+    long_description=open('README.md',  encoding='utf8').read(),
     url='http://github.com/Suor/swgoh-tickets-ocr',
     license='BSD',
 
