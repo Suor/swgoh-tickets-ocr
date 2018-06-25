@@ -10,13 +10,19 @@ from pytesseract import image_to_string
 from Levenshtein import distance
 
 
+__all__ = ['parse_file']
+
+
 def main():
     for filename in sys.argv[1:]:
-        # print(filename)
-        text = ocr_tickets(filename)
-        # print(text)
-        result = parse_tickets(text)
-        print(result)
+        print(parse_file(filename))
+
+
+def parse_file(filename):
+    # print(filename)
+    text = ocr_tickets(filename)
+    # print(text)
+    return parse_tickets(text)
 
 
 # Text handling part
@@ -67,7 +73,8 @@ def parse_name(text):
 
     versions = lmap(guess_name, names)
     return first((guess, warning) for guess, warning in versions if not warning) \
-        or first((guess, warning) for guess, warning in versions if guess)
+        or first((guess, warning) for guess, warning in versions if guess) \
+        or (None, None)
 
 
 def guess_name(name):
@@ -115,7 +122,7 @@ def read_names():
 
 
 # Russian to english, 0 to O
-OCR_NORMALIZE_TABLE = str.maketrans('0КЕНХВАРОСМТукенгхаросмт|', 'OKEHXBAPOCMTyKeHrxapocmTl')
+OCR_NORMALIZE_TABLE = str.maketrans('0КЕНХВАРОСМТукенгхапросмт|', 'OKEHXBAPOCMTyKeHrxanpocmTl')
 
 def ocr_normalize(s):
     return s.translate(OCR_NORMALIZE_TABLE).upper()
@@ -129,6 +136,7 @@ def ocr_tickets(filename):
     np_image = np.asarray(block)
 
     mask = select_colors(np_image)
+    # show(mask)
     return image_to_string(mask, lang='rus+eng')
 
 

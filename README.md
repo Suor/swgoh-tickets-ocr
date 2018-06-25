@@ -54,3 +54,21 @@ python tickets.py screenshot.png screenshot2.png
     'total': 27868
 }
 ```
+
+## Использование как библиотеки
+
+Поставить как описано выше, затем в среде вашего проекта:
+
+```bash
+pip install -e /path/to/this/lib
+```
+
+В коде:
+
+```python
+from tickets
+
+result = tickets.parse_file(filename)
+```
+
+Файлы `config.json` и `dict.txt` должны находиться в текущей директории.

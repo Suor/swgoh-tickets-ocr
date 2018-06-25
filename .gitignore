@@ -1,3 +1,5 @@
 img/*
 config.json
 dict.txt
+*.egg-info
+__pycache__
